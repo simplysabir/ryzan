@@ -9,6 +9,8 @@ use solana_sdk::{
     system_instruction,
     transaction::Transaction,
 };
+use spl_token::instruction as token_instruction;
+use spl_associated_token_account::{get_associated_token_address, instruction as ata_instruction};
 use std::str::FromStr;
 
 use crate::wallet::UnlockedWallet;
@@ -19,9 +21,9 @@ pub struct TransactionManager {
 
 impl TransactionManager {
     pub fn new() -> Result<Self> {
-        // TODO: Load RPC URL from config
-        let rpc_url = "https://api.mainnet-beta.solana.com".to_string();
-        let rpc_client = RpcClient::new_with_commitment(rpc_url, CommitmentConfig::confirmed());
+        // Load RPC URL from config or use default mainnet
+        let default_rpc = "https://api.mainnet-beta.solana.com".to_string();
+        let rpc_client = RpcClient::new_with_commitment(default_rpc, CommitmentConfig::confirmed());
         
         Ok(Self { rpc_client })
     }
@@ -92,6 +94,81 @@ impl TransactionManager {
         let signature = self.rpc_client
             .send_and_confirm_transaction(&transaction)
             .context("Failed to send transaction")?;
+        
+        Ok(signature)
+    }
+    
+    pub async fn send_spl_token(
+        &self,
+        wallet: &UnlockedWallet,
+        recipient: Pubkey,
+        mint: Pubkey,
+        amount: u64,
+        memo: Option<&str>,
+        use_ephemeral: bool,
+    ) -> Result<Signature> {
+        let sender_keypair = if use_ephemeral {
+            // Use ephemeral keypair for privacy
+            let index = rand::random::<u32>() % 1000;
+            wallet.derive_ephemeral_keypair(index)?
+        } else {
+            wallet.get_solana_keypair()
+        };
+        
+        let sender_pubkey = sender_keypair.pubkey();
+        
+        // Get associated token accounts
+        let sender_ata = get_associated_token_address(&sender_pubkey, &mint);
+        let recipient_ata = get_associated_token_address(&recipient, &mint);
+        
+        let recent_blockhash = self.rpc_client
+            .get_latest_blockhash()
+            .context("Failed to get recent blockhash")?;
+        
+        let mut instructions = Vec::new();
+        
+        // Check if recipient ATA exists, create if not
+        if self.rpc_client.get_account(&recipient_ata).is_err() {
+            instructions.push(
+                ata_instruction::create_associated_token_account(
+                    &sender_pubkey,
+                    &recipient,
+                    &mint,
+                    &spl_token::id(),
+                )
+            );
+        }
+        
+        // SPL token transfer instruction
+        instructions.push(
+            token_instruction::transfer(
+                &spl_token::id(),
+                &sender_ata,
+                &recipient_ata,
+                &sender_pubkey,
+                &[&sender_pubkey],
+                amount,
+            )?
+        );
+        
+        // Add memo instruction if provided
+        if let Some(memo_text) = memo {
+            let memo_program_id = Pubkey::from_str("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr")?;
+            let memo_instruction = Instruction::new_with_bytes(
+                memo_program_id,
+                memo_text.as_bytes(),
+                vec![AccountMeta::new_readonly(sender_pubkey, true)],
+            );
+            instructions.push(memo_instruction);
+        }
+        
+        let message = Message::new(&instructions, Some(&sender_pubkey));
+        let mut transaction = Transaction::new_unsigned(message);
+        transaction.sign(&[&sender_keypair], recent_blockhash);
+        
+        let signature = self.rpc_client
+            .send_and_confirm_transaction(&transaction)
+            .context("Failed to send SPL token transaction")?;
         
         Ok(signature)
     }

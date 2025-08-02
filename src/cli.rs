@@ -3,8 +3,8 @@ use anyhow::Result;
 
 #[derive(Parser)]
 #[command(name = "ryzan")]
-#[command(about = "Ultra-secure Solana wallet CLI with hardware-level security and zero-trust architecture")]
-#[command(version = "0.1.0")]
+#[command(about = "Enterprise-grade security with zero-trust architecture - Professional crypto management made simple")]
+#[command(version = "1.0.0")]
 #[command(author = "Ryzan Team")]
 pub struct Cli {
     #[command(subcommand)]
@@ -43,12 +43,12 @@ pub enum Commands {
         totp: Option<String>,
     },
     
-    /// Send SOL to an address
+    /// Send SOL or SPL tokens to an address
     Send {
         /// Recipient address
         address: String,
         
-        /// Amount in SOL
+        /// Amount to send
         amount: f64,
         
         /// TOTP code for transaction authorization
@@ -62,6 +62,10 @@ pub enum Commands {
         /// Use ephemeral keypair for privacy
         #[arg(long, default_value = "true")]
         ephemeral: bool,
+        
+        /// SPL token mint address (if sending tokens instead of SOL)
+        #[arg(long)]
+        token: Option<String>,
     },
     
     /// Generate a receive address
@@ -255,7 +259,7 @@ pub fn print_banner() {
     println!("\x1b[38;5;214m⚡\x1b[0m");
     println!("\x1b[90m                                              \x1b[0m");
     println!("\x1b[38;5;208m    ⚡ Ultra-Secure Solana Wallet ⚡\x1b[0m");
-    println!("\x1b[90m   Hardware-level security with zero-trust architecture\x1b[0m");
+    println!("\x1b[90m   Military-grade security with zero-trust architecture\x1b[0m");
     println!("\x1b[90m              Unbreakable crypto at $0 cost\x1b[0m");
     println!();
 }

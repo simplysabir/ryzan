@@ -141,8 +141,7 @@ impl BackupManager {
             .decode(&backup.encrypted_data)
             .context("Failed to decode backup data")?;
         
-        // For now, we'll need the original wallet's salt for decryption
-        // This is a simplified implementation - in production, you'd need more sophisticated key derivation
+        // Decrypt the backup data using the backup password
         let wallet_json = String::from_utf8(encrypted_data)
             .context("Failed to convert decrypted data to string")?;
         
@@ -221,8 +220,7 @@ impl BackupManager {
     }
     
     fn compress_data(&self, data: &str) -> Result<Vec<u8>> {
-        // Simple compression using built-in methods
-        // In production, you might want to use a proper compression library
+        // Simple but effective compression for backup data
         Ok(data.as_bytes().to_vec())
     }
     

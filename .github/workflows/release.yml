@@ -1,0 +1,228 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x86_64 - native build
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact_name: ryzan
+            asset_name: ryzan-linux-x86_64
+            cross: false
+          
+          # macOS targets - native builds
+          - target: x86_64-apple-darwin
+            os: macos-13  # Intel runner
+            artifact_name: ryzan
+            asset_name: ryzan-macos-x86_64
+            cross: false
+          - target: aarch64-apple-darwin
+            os: macos-latest  # ARM64 runner
+            artifact_name: ryzan
+            asset_name: ryzan-macos-aarch64
+            cross: false
+          
+          # Windows x86_64 - native build
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            artifact_name: ryzan.exe
+            asset_name: ryzan-windows-x86_64.exe
+            cross: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation tool
+        if: matrix.cross == true
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ matrix.target }}-
+            ${{ runner.os }}-cargo-
+
+      - name: Build with cross (for cross-compilation)
+        if: matrix.cross == true
+        env:
+          OPENSSL_STATIC: 1
+          OPENSSL_VENDORED: 1
+        run: cross build --release --target ${{ matrix.target }}
+
+      - name: Build natively
+        if: matrix.cross == false
+        env:
+          OPENSSL_STATIC: 1
+          OPENSSL_VENDORED: 1
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Strip binary (Unix)
+        if: matrix.os != 'windows-latest'
+        run: strip target/${{ matrix.target }}/release/${{ matrix.artifact_name }} || true
+
+      - name: Create tarball (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar czf ${{ matrix.asset_name }}.tar.gz ${{ matrix.artifact_name }}
+
+      - name: Create zip (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          if (Test-Path "${{ matrix.asset_name }}.zip") { Remove-Item "${{ matrix.asset_name }}.zip" -Force }
+          Compress-Archive -Path ${{ matrix.artifact_name }} -DestinationPath ${{ matrix.asset_name }}.zip
+
+      - name: Upload artifacts (Unix)
+        if: matrix.os != 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: target/${{ matrix.target }}/release/${{ matrix.asset_name }}.tar.gz
+          if-no-files-found: error
+
+      - name: Upload artifacts (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: target/${{ matrix.target }}/release/${{ matrix.asset_name }}.zip
+          if-no-files-found: error
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: always() && (needs.build.result == 'success' || needs.build.result == 'failure')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+        continue-on-error: true
+
+      - name: Display structure of downloaded files
+        run: find artifacts -type f -name "*.tar.gz" -o -name "*.zip" | head -20
+
+      - name: Get tag name
+        id: tag_name
+        run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          if [ -f CHANGELOG.md ]; then
+            awk '/^## \[?'${{ steps.tag_name.outputs.TAG_NAME }}'\]?/ {flag=1; next} /^## / {flag=0} flag' CHANGELOG.md > current_changelog.txt
+            if [ -s current_changelog.txt ]; then
+              echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+              cat current_changelog.txt >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+            else
+              echo "CHANGELOG=See commits for changes in this release." >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "CHANGELOG=See commits for changes in this release." >> $GITHUB_OUTPUT
+          fi
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release_files
+          find artifacts -name "*.tar.gz" -exec cp {} release_files/ \; 2>/dev/null || true
+          find artifacts -name "*.zip" -exec cp {} release_files/ \; 2>/dev/null || true
+          ls -la release_files/ || echo "No release files found"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag_name.outputs.TAG_NAME }}
+          name: Ryzan ${{ steps.tag_name.outputs.TAG_NAME }}
+          body: |
+            ## ⚡ Ryzan - Ultra-Secure Solana Wallet CLI
+
+            **Enterprise-grade security with zero-trust architecture**
+
+            ## Changes
+            ${{ steps.changelog.outputs.CHANGELOG }}
+
+            ## 🚀 Installation
+
+            ### Quick Install Script (Recommended)
+            ```bash
+            curl -sSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash
+            ```
+
+            ### Manual Install
+            ```bash
+            # Linux x86_64
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.tag_name.outputs.TAG_NAME }}/ryzan-linux-x86_64.tar.gz | tar xz
+            sudo mv ryzan /usr/local/bin/
+
+            # macOS (Intel)
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.tag_name.outputs.TAG_NAME }}/ryzan-macos-x86_64.tar.gz | tar xz
+            sudo mv ryzan /usr/local/bin/
+
+            # macOS (Apple Silicon)
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.tag_name.outputs.TAG_NAME }}/ryzan-macos-aarch64.tar.gz | tar xz
+            sudo mv ryzan /usr/local/bin/
+            ```
+
+            ### Docker
+            ```bash
+            docker run -it simplysabir/ryzan:${{ steps.tag_name.outputs.TAG_NAME }}
+            ```
+
+            ### Quick Start
+            ```bash
+            ryzan create --name main
+            ryzan unlock --name main
+            ryzan balance
+            ```
+
+            ## 🔐 Security Features
+            - **Military-grade encryption** with ChaCha20-Poly1305
+            - **Mandatory 2FA** for all transactions
+            - **Ephemeral keys** for maximum privacy
+            - **SOL + SPL tokens** support
+            - **Enterprise backup** system
+
+            **⚠️ Security Notice:** Always test with small amounts first. Set up TOTP 2FA and backup your recovery phrase securely.
+
+            ### Download Binaries
+            Download the appropriate binary for your platform from the assets below.
+          draft: false
+          prerelease: false
+          files: release_files/*
+          fail_on_unmatched_files: false

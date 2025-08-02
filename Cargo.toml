@@ -1,9 +1,16 @@
 [package]
 name = "ryzan"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 description = "Ultra-secure Solana wallet CLI with hardware-level security and zero-trust architecture"
 license = "MIT"
+authors = ["Sabir Khan <simplysabir@gmail.com>"]
+repository = "https://github.com/simplysabir/ryzan"
+homepage = "https://github.com/simplysabir/ryzan"
+documentation = "https://github.com/simplysabir/ryzan#readme"
+keywords = ["solana", "wallet", "cli"]
+categories = ["command-line-utilities"]
+readme = "README.md"
 
 [[bin]]
 name = "ryzan"
@@ -25,6 +32,8 @@ qrcode = "0.14"
 # Solana
 solana-sdk = "1.16"
 solana-client = "1.16"
+spl-token = "4.0"
+spl-associated-token-account = "2.0"
 
 # CLI and serialization
 clap = { version = "4.0", features = ["derive"] }
@@ -49,3 +58,7 @@ rand = "0.8"
 base32 = "0.4"
 urlencoding = "2.1"
 rpassword = "7.3"
+bs58 = "0.5"
+
+[dev-dependencies]
+tempfile = "3.8"

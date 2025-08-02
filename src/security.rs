@@ -259,10 +259,18 @@ impl SecurityManager {
         {
             if let Ok(output) = Command::new("uptime").output() {
                 let output_str = String::from_utf8_lossy(&output.stdout);
-                // Very basic load check - in production you'd want more sophisticated monitoring
+                // System load monitoring for suspicious activity
                 if output_str.contains("load average:") {
-                    // Extract load average and check if it's unusually high
-                    return Ok(false); // Simplified for now
+                    // Parse load averages and check for unusual patterns
+                    if let Some(load_start) = output_str.find("load average:") {
+                        let load_part = &output_str[load_start + 13..];
+                        if let Some(first_load) = load_part.split(',').next() {
+                            if let Ok(load_value) = first_load.trim().parse::<f64>() {
+                                // Consider load suspicious if over 8.0 on most systems
+                                return Ok(load_value > 8.0);
+                            }
+                        }
+                    }
                 }
             }
         }

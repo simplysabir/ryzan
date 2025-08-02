@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  ryzan:
+    build: .
+    image: simplysabir/ryzan:latest
+    container_name: ryzan-wallet
+    stdin_open: true
+    tty: true
+    volumes:
+      # Mount config directory for persistent storage
+      - ryzan_config:/home/ryzan/.config/ryzan
+    environment:
+      - RUST_LOG=info
+    networks:
+      - ryzan-net
+    restart: unless-stopped
+    # Override default command for interactive mode
+    command: ["--help"]
+
+volumes:
+  ryzan_config:
+    driver: local
+
+networks:
+  ryzan-net:
+    driver: bridge
