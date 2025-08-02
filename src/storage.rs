@@ -303,7 +303,6 @@ struct BackupFormat {
 mod tests {
     use super::*;
 
-
     #[test]
     fn test_storage_operations() {
         let storage = SecureStorage::new().unwrap();
