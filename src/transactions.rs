@@ -346,13 +346,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_transaction_manager_creation() {
-        // This test requires network access, so we'll skip in testing
-        // let tx_manager = TransactionManager::new();
-        // assert!(tx_manager.is_ok());
-    }
-
-    #[test]
     fn test_batch_transaction_parsing() {
         let json = r#"[
             {

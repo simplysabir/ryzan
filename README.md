@@ -84,12 +84,52 @@ ryzan send <address> 100 --totp <code> --token <mint-address>
 
 ## Docker Support
 
-```bash
-# Run with Docker
-docker run -it simplysabir/ryzan:latest
+### Build and Run Locally
 
-# Or use docker-compose
-docker-compose up -d
+```bash
+# Build the Docker image
+docker build -t ryzan:latest .
+
+# Run interactively
+docker run -it --rm ryzan:latest
+
+# Run with persistent storage
+docker run -it --rm \
+  -v ryzan_config:/home/ryzan/.config/ryzan \
+  ryzan:latest
+
+# Or use docker-compose for easier management
+docker compose up -d
+docker compose exec ryzan ryzan --help
+```
+
+### Development with Docker
+
+```bash
+# Build and run in development mode
+docker compose up --build
+
+# Access the container shell
+docker compose exec ryzan bash
+
+# Run specific commands
+docker compose exec ryzan ryzan create --name test
+
+# Use the convenience script
+./docker-run.sh build
+./docker-run.sh run --help
+./docker-run.sh start
+```
+
+### Development Environment
+
+For active development with live code changes:
+
+```bash
+# Use development compose file
+docker compose -f docker-compose.dev.yml up --build
+
+# This mounts your source code and enables live development
 ```
 
 ## Need Help?

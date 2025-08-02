@@ -1,5 +1,5 @@
 # Multi-stage build for Ryzan Wallet
-FROM rust:1.70-slim as builder
+FROM rust:latest as builder
 
 # Install required dependencies
 RUN apt-get update && apt-get install -y \
@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy manifests
+# Copy manifests first for better caching
 COPY Cargo.toml Cargo.lock ./
 
 # Copy source code

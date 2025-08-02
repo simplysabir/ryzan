@@ -1,22 +1,21 @@
-version: '3.8'
-
 services:
   ryzan:
     build: .
-    image: simplysabir/ryzan:latest
     container_name: ryzan-wallet
     stdin_open: true
     tty: true
     volumes:
       # Mount config directory for persistent storage
       - ryzan_config:/home/ryzan/.config/ryzan
+      # Mount current directory for development
+      - .:/app
     environment:
       - RUST_LOG=info
     networks:
       - ryzan-net
     restart: unless-stopped
-    # Override default command for interactive mode
-    command: ["--help"]
+    # Keep container running for interactive use
+    entrypoint: ["tail", "-f", "/dev/null"]
 
 volumes:
   ryzan_config:

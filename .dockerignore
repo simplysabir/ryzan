@@ -1,47 +1,36 @@
-# Build artifacts
-target/
-Cargo.lock
-
 # Git
-.git/
+.git
 .gitignore
 
-# Documentation
-README.md
-USAGE.md
-TEST_COVERAGE.md
-docs/
-web/
+# Rust build artifacts
+target/
 
-# Config files
-.env
-.env.local
-
-# IDE
+# IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
 
-# OS
+# OS files
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
+# Documentation
+README.md
+*.md
+
+# Docker files (to avoid recursive copying)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Web files (not needed for CLI)
+web/
 
 # Temporary files
-tmp/
-temp/
 *.tmp
-
-# Node modules (if any)
-node_modules/
+*.log
 
 # Backup files
 *.bak
 *.backup
-
-# Test files
-tests/fixtures/

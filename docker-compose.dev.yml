@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  ryzan-dev:
+    build: .
+    container_name: ryzan-dev
+    stdin_open: true
+    tty: true
+    volumes:
+      # Mount source code for live development
+      - .:/app
+      # Mount config directory for persistent storage
+      - ryzan_config:/home/ryzan/.config/ryzan
+      # Mount cargo cache for faster builds
+      - cargo_cache:/usr/local/cargo/registry
+      - cargo_cache_index:/usr/local/cargo/git
+    environment:
+      - RUST_LOG=debug
+      - CARGO_TARGET_DIR=/app/target
+    working_dir: /app
+    networks:
+      - ryzan-dev-net
+    # Override to run in development mode
+    command: ["bash", "-c", "cargo build && cargo run -- --help"]
+
+volumes:
+  ryzan_config:
+    driver: local
+  cargo_cache:
+    driver: local
+  cargo_cache_index:
+    driver: local
+
+networks:
+  ryzan-dev-net:
+    driver: bridge 
