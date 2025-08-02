@@ -8,16 +8,16 @@ mod totp;
 mod transactions;
 mod wallet;
 
+use anyhow::{Context, Result};
 use clap::Parser;
-use anyhow::{Result, Context};
 
-use cli::{Cli, print_banner, print_security_warning, clear_terminal};
+use cli::{clear_terminal, print_banner, print_security_warning, Cli};
 use commands::CommandHandler;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
-    
+
     // Only show banner for wallet creation or when no specific command
     match &cli.command {
         cli::Commands::Create { .. } => {
@@ -30,13 +30,13 @@ async fn main() -> Result<()> {
             clear_terminal();
         }
     }
-    
-    let mut handler = CommandHandler::new()
-        .context("Failed to initialize Ryzan wallet")?;
-    
-    handler.execute(cli.command)
+
+    let mut handler = CommandHandler::new().context("Failed to initialize Ryzan wallet")?;
+
+    handler
+        .execute(cli.command)
         .await
         .context("Command execution failed")?;
-    
+
     Ok(())
 }

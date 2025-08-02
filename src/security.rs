@@ -1,10 +1,10 @@
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
 use std::thread;
+use std::time::{Duration, Instant};
 use zeroize::Zeroize;
 
 #[cfg(unix)]
@@ -18,48 +18,48 @@ pub struct SecurityManager {
 
 impl SecurityManager {
     pub fn new() -> Result<Self> {
-        let binary_path = std::env::current_exe()
-            .context("Failed to get current executable path")?;
-        
+        let binary_path =
+            std::env::current_exe().context("Failed to get current executable path")?;
+
         let mut manager = Self {
             binary_path,
             binary_hash: None,
             locked_memory: Vec::new(),
         };
-        
+
         // Calculate and store binary hash for integrity checks
         manager.binary_hash = Some(manager.calculate_binary_hash()?);
-        
+
         Ok(manager)
     }
-    
+
     pub fn verify_binary_integrity(&self) -> Result<bool> {
         let current_hash = self.calculate_binary_hash()?;
-        
+
         match &self.binary_hash {
             Some(original_hash) => Ok(current_hash == *original_hash),
             None => Ok(false),
         }
     }
-    
+
     fn calculate_binary_hash(&self) -> Result<String> {
-        let mut file = File::open(&self.binary_path)
-            .context("Failed to open binary file for hashing")?;
-        
+        let mut file =
+            File::open(&self.binary_path).context("Failed to open binary file for hashing")?;
+
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)
             .context("Failed to read binary file")?;
-        
+
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
-        
+
         let mut hasher = DefaultHasher::new();
         buffer.hash(&mut hasher);
         let hash = hasher.finish();
-        
+
         Ok(format!("{:x}", hash))
     }
-    
+
     #[cfg(unix)]
     pub fn lock_memory(&mut self, ptr: *mut u8, size: usize) -> Result<()> {
         unsafe {
@@ -67,11 +67,11 @@ impl SecurityManager {
                 return Err(anyhow::anyhow!("Failed to lock memory"));
             }
         }
-        
+
         self.locked_memory.push(ptr);
         Ok(())
     }
-    
+
     #[cfg(unix)]
     pub fn unlock_memory(&mut self, ptr: *mut u8, size: usize) -> Result<()> {
         unsafe {
@@ -79,62 +79,59 @@ impl SecurityManager {
                 return Err(anyhow::anyhow!("Failed to unlock memory"));
             }
         }
-        
+
         self.locked_memory.retain(|&p| p != ptr);
         Ok(())
     }
-    
+
     #[cfg(not(unix))]
     pub fn lock_memory(&mut self, _ptr: *mut u8, _size: usize) -> Result<()> {
         // Memory locking not implemented for non-Unix systems
         Ok(())
     }
-    
+
     #[cfg(not(unix))]
     pub fn unlock_memory(&mut self, _ptr: *mut u8, _size: usize) -> Result<()> {
         // Memory unlocking not implemented for non-Unix systems
         Ok(())
     }
-    
+
     pub fn perform_decoy_operations(&self) -> Result<()> {
         // Perform fake crypto operations to confuse potential keyloggers
         let start = Instant::now();
-        
+
         // Simulate various crypto operations
         for i in 0..5 {
             let fake_data = format!("fake_operation_{}", i);
             let _ = self.fake_encrypt(fake_data.as_bytes());
-            
+
             // Add random delays
             let delay = Duration::from_millis(50 + (i * 25));
             thread::sleep(delay);
         }
-        
+
         // Ensure this takes at least 200ms to look realistic
         let elapsed = start.elapsed();
         if elapsed < Duration::from_millis(200) {
             thread::sleep(Duration::from_millis(200) - elapsed);
         }
-        
+
         Ok(())
     }
-    
+
     fn fake_encrypt(&self, data: &[u8]) -> Vec<u8> {
         // Perform fake encryption that looks like real crypto
         data.iter().map(|b| b.wrapping_add(42)).collect()
     }
-    
+
     pub fn clear_terminal_history(&self) -> Result<()> {
         // Clear terminal screen and scrollback
         print!("\x1B[2J\x1B[3J\x1B[1;1H");
         std::io::stdout().flush()?;
-        
+
         // Additional clearing for different terminal types
-        let clear_commands = vec![
-            "clear",
-            "printf '\\033[2J\\033[3J\\033[1;1H'",
-        ];
-        
+        let clear_commands = vec!["clear", "printf '\\033[2J\\033[3J\\033[1;1H'"];
+
         for cmd in clear_commands {
             let _ = Command::new("sh")
                 .arg("-c")
@@ -143,10 +140,10 @@ impl SecurityManager {
                 .stderr(Stdio::null())
                 .status();
         }
-        
+
         Ok(())
     }
-    
+
     pub fn secure_input_mode(&self) -> Result<()> {
         // Disable terminal echo and enable raw mode for secure input
         #[cfg(unix)]
@@ -157,10 +154,10 @@ impl SecurityManager {
                 .stderr(Stdio::null())
                 .status();
         }
-        
+
         Ok(())
     }
-    
+
     pub fn restore_input_mode(&self) -> Result<()> {
         // Restore normal terminal mode
         #[cfg(unix)]
@@ -171,88 +168,85 @@ impl SecurityManager {
                 .stderr(Stdio::null())
                 .status();
         }
-        
+
         Ok(())
     }
-    
+
     pub fn check_process_environment(&self) -> Result<SecurityReport> {
         let mut report = SecurityReport::new();
-        
+
         // Check for debugging tools
         report.debugger_detected = self.detect_debugger()?;
-        
+
         // Check for suspicious processes
         report.suspicious_processes = self.scan_processes()?;
-        
+
         // Check for keyloggers (basic detection)
         report.potential_keylogger = self.detect_keylogger()?;
-        
+
         // Check system load (could indicate mining malware)
         report.high_system_load = self.check_system_load()?;
-        
+
         Ok(report)
     }
-    
+
     fn detect_debugger(&self) -> Result<bool> {
         // Check for common debugging indicators
-        let debug_env_vars = vec![
-            "RUST_BACKTRACE",
-            "_DEBUG",
-            "DEBUG",
-        ];
-        
+        let debug_env_vars = vec!["RUST_BACKTRACE", "_DEBUG", "DEBUG"];
+
         for var in debug_env_vars {
             if std::env::var(var).is_ok() {
                 return Ok(true);
             }
         }
-        
+
         // Check for debugger processes (basic)
         let debugger_processes = vec!["gdb", "lldb", "strace", "dtrace"];
-        
+
         for process in debugger_processes {
             if self.is_process_running(process)? {
                 return Ok(true);
             }
         }
-        
+
         Ok(false)
     }
-    
+
     fn scan_processes(&self) -> Result<Vec<String>> {
         let mut suspicious = Vec::new();
-        
+
         let suspicious_names = vec![
-            "keylogger", "wireshark", "tcpdump", "nmap",
-            "metasploit", "burp", "proxychains",
+            "keylogger",
+            "wireshark",
+            "tcpdump",
+            "nmap",
+            "metasploit",
+            "burp",
+            "proxychains",
         ];
-        
+
         for name in suspicious_names {
             if self.is_process_running(name)? {
                 suspicious.push(name.to_string());
             }
         }
-        
+
         Ok(suspicious)
     }
-    
+
     fn detect_keylogger(&self) -> Result<bool> {
         // Basic keylogger detection
-        let keylogger_indicators = vec![
-            "/tmp/.keylog",
-            "/var/log/keylog",
-            "keylogger.log",
-        ];
-        
+        let keylogger_indicators = vec!["/tmp/.keylog", "/var/log/keylog", "keylogger.log"];
+
         for path in keylogger_indicators {
             if Path::new(path).exists() {
                 return Ok(true);
             }
         }
-        
+
         Ok(false)
     }
-    
+
     fn check_system_load(&self) -> Result<bool> {
         // Check if system load is suspiciously high
         #[cfg(unix)]
@@ -274,10 +268,10 @@ impl SecurityManager {
                 }
             }
         }
-        
+
         Ok(false)
     }
-    
+
     fn is_process_running(&self, process_name: &str) -> Result<bool> {
         #[cfg(unix)]
         {
@@ -285,10 +279,10 @@ impl SecurityManager {
                 .arg(process_name)
                 .output()
                 .context("Failed to check for running processes")?;
-            
+
             return Ok(!output.stdout.is_empty());
         }
-        
+
         #[cfg(windows)]
         {
             let output = Command::new("tasklist")
@@ -296,15 +290,15 @@ impl SecurityManager {
                 .arg(&format!("IMAGENAME eq {}.exe", process_name))
                 .output()
                 .context("Failed to check for running processes")?;
-            
+
             let output_str = String::from_utf8_lossy(&output.stdout);
             return Ok(output_str.contains(process_name));
         }
-        
+
         #[cfg(not(any(unix, windows)))]
         Ok(false)
     }
-    
+
     pub fn create_isolation_environment(&self) -> Result<IsolatedEnvironment> {
         // Create a sandboxed environment for crypto operations
         IsolatedEnvironment::new()
@@ -329,7 +323,7 @@ impl SecurityReport {
             binary_integrity_ok: true,
         }
     }
-    
+
     pub fn has_security_issues(&self) -> bool {
         self.debugger_detected
             || !self.suspicious_processes.is_empty()
@@ -337,36 +331,43 @@ impl SecurityReport {
             || self.high_system_load
             || !self.binary_integrity_ok
     }
-    
+
     pub fn print_report(&self) {
         println!("┌─────────────────────────────────────────────────────────────┐");
         println!("│                    🛡️  SECURITY SCAN REPORT                │");
         println!("├─────────────────────────────────────────────────────────────┤");
-        
-        let status = if self.has_security_issues() { "⚠️  WARNINGS DETECTED" } else { "✅ ALL CLEAR" };
+
+        let status = if self.has_security_issues() {
+            "⚠️  WARNINGS DETECTED"
+        } else {
+            "✅ ALL CLEAR"
+        };
         println!("│ Status: {:<52} │", status);
         println!("│                                                             │");
-        
+
         if self.debugger_detected {
             println!("│ ⚠️  Debugger detected                                      │");
         }
-        
+
         if !self.suspicious_processes.is_empty() {
-            println!("│ ⚠️  Suspicious processes: {:<34} │", self.suspicious_processes.join(", "));
+            println!(
+                "│ ⚠️  Suspicious processes: {:<34} │",
+                self.suspicious_processes.join(", ")
+            );
         }
-        
+
         if self.potential_keylogger {
             println!("│ ⚠️  Potential keylogger detected                           │");
         }
-        
+
         if self.high_system_load {
             println!("│ ⚠️  Unusually high system load                            │");
         }
-        
+
         if !self.binary_integrity_ok {
             println!("│ ❌ Binary integrity check failed                          │");
         }
-        
+
         println!("└─────────────────────────────────────────────────────────────┘");
     }
 }
@@ -377,12 +378,13 @@ pub struct IsolatedEnvironment {
 
 impl IsolatedEnvironment {
     fn new() -> Result<Self> {
-        let temp_dir = std::env::temp_dir().join(format!("ryzan_isolated_{}", uuid::Uuid::new_v4()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("ryzan_isolated_{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&temp_dir)?;
-        
+
         Ok(Self { temp_dir })
     }
-    
+
     pub fn execute_isolated<F, T>(&self, operation: F) -> Result<T>
     where
         F: FnOnce() -> Result<T>,
@@ -390,13 +392,13 @@ impl IsolatedEnvironment {
         // Change to isolated directory
         let original_dir = std::env::current_dir()?;
         std::env::set_current_dir(&self.temp_dir)?;
-        
+
         // Execute the operation
         let result = operation();
-        
+
         // Restore original directory
         std::env::set_current_dir(original_dir)?;
-        
+
         result
     }
 }
@@ -419,7 +421,7 @@ impl Drop for SecurityManager {
                 }
             }
         }
-        
+
         // Clear terminal on exit
         let _ = self.clear_terminal_history();
     }
@@ -428,27 +430,27 @@ impl Drop for SecurityManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_security_manager_creation() {
         let manager = SecurityManager::new();
         assert!(manager.is_ok());
     }
-    
+
     #[test]
     fn test_security_report() {
         let report = SecurityReport::new();
         assert!(!report.has_security_issues());
     }
-    
+
     #[test]
     fn test_isolated_environment() {
         let env = IsolatedEnvironment::new().unwrap();
-        
-        let result = env.execute_isolated(|| {
-            Ok("test_result".to_string())
-        }).unwrap();
-        
+
+        let result = env
+            .execute_isolated(|| Ok("test_result".to_string()))
+            .unwrap();
+
         assert_eq!(result, "test_result");
     }
 }
