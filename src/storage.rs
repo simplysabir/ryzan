@@ -46,10 +46,13 @@ impl SecureStorage {
     }
 
     fn set_secure_permissions(path: &Path) -> Result<()> {
-        let metadata = fs::metadata(path)?;
-        let mut permissions = metadata.permissions();
-        permissions.set_mode(0o700); // rwx------
-        fs::set_permissions(path, permissions)?;
+        #[cfg(unix)]
+        {
+            let metadata = fs::metadata(path)?;
+            let mut permissions = metadata.permissions();
+            permissions.set_mode(0o700); // rwx------
+            fs::set_permissions(path, permissions)?;
+        }
         Ok(())
     }
 
