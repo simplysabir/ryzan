@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
+use reqwest;
 use solana_sdk::pubkey::Pubkey;
 use spl_associated_token_account::get_associated_token_address;
 use spl_token::state::Mint;
 use std::io::{self, Write};
 use std::str::FromStr;
-use reqwest;
 
 use crate::backup::BackupManager;
 use crate::cli::{print_operation_status, Commands};
@@ -1105,15 +1105,15 @@ impl CommandHandler {
         println!("🔄 Ryzan Wallet Update");
         println!("═════════════════════════");
         println!();
-        
+
         // Get current version from Cargo.toml
         let current_version = env!("CARGO_PKG_VERSION");
         println!("Current version: {}", current_version);
-        
+
         // Check for latest version from GitHub API
         print!("Checking for updates... ");
         io::stdout().flush()?;
-        
+
         let latest_version = match self.get_latest_version().await {
             Ok(version) => {
                 println!("✅");
@@ -1140,16 +1140,16 @@ impl CommandHandler {
                 }
             }
         };
-        
+
         println!("Latest version: {}", latest_version);
         println!();
-        
+
         // Compare versions
         if current_version == latest_version {
             println!("✅ You're already running the latest version!");
             return Ok(());
         }
-        
+
         println!("🔄 Update available!");
         println!();
         println!("Choose your preferred update method:");
@@ -1157,13 +1157,13 @@ impl CommandHandler {
         println!("2. Installation script (recommended for end users)");
         println!("3. Cancel update");
         println!();
-        
+
         print!("Enter your choice (1-3): ");
         io::stdout().flush()?;
-        
+
         let mut choice = String::new();
         io::stdin().read_line(&mut choice)?;
-        
+
         match choice.trim() {
             "1" => {
                 println!();
@@ -1188,10 +1188,10 @@ impl CommandHandler {
                 return Ok(());
             }
         }
-        
+
         Ok(())
     }
-    
+
     async fn get_latest_version(&self) -> Result<String> {
         let client = reqwest::Client::new();
         let response = client
@@ -1199,33 +1199,38 @@ impl CommandHandler {
             .header("User-Agent", "ryzan-wallet-cli")
             .send()
             .await?;
-        
+
         if response.status() == 404 {
-            return Err(anyhow::anyhow!("No releases found - you're running the latest development version"));
+            return Err(anyhow::anyhow!(
+                "No releases found - you're running the latest development version"
+            ));
         }
-        
+
         if !response.status().is_success() {
-            return Err(anyhow::anyhow!("Failed to fetch latest version: HTTP {}", response.status()));
+            return Err(anyhow::anyhow!(
+                "Failed to fetch latest version: HTTP {}",
+                response.status()
+            ));
         }
-        
+
         let json: serde_json::Value = response.json().await?;
         let tag_name = json["tag_name"]
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Invalid response format"))?;
-        
+
         // Remove 'v' prefix if present
         let version = tag_name.trim_start_matches('v');
         Ok(version.to_string())
     }
-    
+
     async fn update_via_cargo(&self) -> Result<()> {
         println!("Running: cargo install ryzan --force");
         println!();
-        
+
         let status = std::process::Command::new("cargo")
             .args(["install", "ryzan", "--force"])
             .status()?;
-        
+
         if status.success() {
             println!("✅ Update completed successfully!");
             println!();
@@ -1235,19 +1240,19 @@ impl CommandHandler {
             println!();
             println!("Run: curl -sSL https://raw.githubusercontent.com/simplysabir/ryzan/main/install.sh | bash");
         }
-        
+
         Ok(())
     }
-    
+
     async fn update_via_script(&self) -> Result<()> {
         println!("Downloading and running installation script...");
         println!();
-        
+
         let status = std::process::Command::new("bash")
             .arg("-c")
             .arg("curl -sSL https://raw.githubusercontent.com/simplysabir/ryzan/main/install.sh | bash")
             .status()?;
-        
+
         if status.success() {
             println!("✅ Update completed successfully!");
             println!();
@@ -1259,7 +1264,7 @@ impl CommandHandler {
             println!("2. Download the latest version for your platform");
             println!("3. Replace your current binary");
         }
-        
+
         Ok(())
     }
 
