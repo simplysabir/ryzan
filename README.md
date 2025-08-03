@@ -72,6 +72,28 @@ ryzan send <address> 100 --totp <code> --token <mint-address>
 | `ryzan balance` | Check wallet balance |
 | `ryzan backup --output backup.json --totp <code>` | Create encrypted backup |
 | `ryzan recover --file backup.json` | Restore from backup |
+| `ryzan update` | Auto-update to latest version |
+
+## Auto-Update Feature
+
+Ryzan includes a production-ready auto-update system that checks for the latest version and offers multiple update methods:
+
+```bash
+# Check for updates and choose your preferred method
+ryzan update
+```
+
+The update system will:
+- ✅ Check for the latest version from GitHub releases
+- 🔄 Compare with your current version
+- 🎯 Offer choice between cargo install and installation script
+- 🛡️ Preserve all wallet data during updates
+- 📱 Provide fallback options if no releases are available
+
+**Update Methods:**
+1. **Cargo Install** (recommended for developers): `cargo install ryzan --force`
+2. **Installation Script** (recommended for end users): Downloads and runs the latest install script
+3. **Manual Update**: Provides instructions for manual installation
 
 ## Security Features
 

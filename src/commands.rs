@@ -4,6 +4,7 @@ use spl_associated_token_account::get_associated_token_address;
 use spl_token::state::Mint;
 use std::io::{self, Write};
 use std::str::FromStr;
+use reqwest;
 
 use crate::backup::BackupManager;
 use crate::cli::{print_operation_status, Commands};
@@ -1104,16 +1105,161 @@ impl CommandHandler {
         println!("🔄 Ryzan Wallet Update");
         println!("═════════════════════════");
         println!();
-        println!("❌ Auto-update is not yet implemented");
+        
+        // Get current version from Cargo.toml
+        let current_version = env!("CARGO_PKG_VERSION");
+        println!("Current version: {}", current_version);
+        
+        // Check for latest version from GitHub API
+        print!("Checking for updates... ");
+        io::stdout().flush()?;
+        
+        let latest_version = match self.get_latest_version().await {
+            Ok(version) => {
+                println!("✅");
+                version
+            }
+            Err(e) => {
+                println!("❌");
+                if e.to_string().contains("No releases found") {
+                    println!("ℹ️  No official releases available yet.");
+                    println!("   You're running the latest development version.");
+                    println!();
+                    println!("To get the latest development build:");
+                    println!("1. Visit: https://github.com/simplysabir/ryzan");
+                    println!("2. Clone the repository: git clone https://github.com/simplysabir/ryzan.git");
+                    println!("3. Build from source: cargo build --release");
+                    println!();
+                    println!("Or use the installation script for the latest build:");
+                    println!("   curl -sSL https://raw.githubusercontent.com/simplysabir/ryzan/main/install.sh | bash");
+                    return Ok(());
+                } else {
+                    println!("Failed to check for updates: {}", e);
+                    println!("Please check your internet connection.");
+                    return Ok(());
+                }
+            }
+        };
+        
+        println!("Latest version: {}", latest_version);
         println!();
-        println!("To update manually:");
-        println!("1. Check for new releases at: https://github.com/your-repo/ryzan");
-        println!("2. Download the latest version");
-        println!("3. Replace your current binary");
-        println!("4. Your wallet data will remain safe");
+        
+        // Compare versions
+        if current_version == latest_version {
+            println!("✅ You're already running the latest version!");
+            return Ok(());
+        }
+        
+        println!("🔄 Update available!");
         println!();
-        println!("Current version: 0.1.0");
-
+        println!("Choose your preferred update method:");
+        println!("1. Cargo install (recommended for developers)");
+        println!("2. Installation script (recommended for end users)");
+        println!("3. Cancel update");
+        println!();
+        
+        print!("Enter your choice (1-3): ");
+        io::stdout().flush()?;
+        
+        let mut choice = String::new();
+        io::stdin().read_line(&mut choice)?;
+        
+        match choice.trim() {
+            "1" => {
+                println!();
+                println!("🚀 Updating via cargo install...");
+                println!();
+                self.update_via_cargo().await?;
+            }
+            "2" => {
+                println!();
+                println!("🚀 Updating via installation script...");
+                println!();
+                self.update_via_script().await?;
+            }
+            "3" => {
+                println!();
+                println!("Update cancelled.");
+                return Ok(());
+            }
+            _ => {
+                println!();
+                println!("Invalid choice. Update cancelled.");
+                return Ok(());
+            }
+        }
+        
+        Ok(())
+    }
+    
+    async fn get_latest_version(&self) -> Result<String> {
+        let client = reqwest::Client::new();
+        let response = client
+            .get("https://api.github.com/repos/simplysabir/ryzan/releases/latest")
+            .header("User-Agent", "ryzan-wallet-cli")
+            .send()
+            .await?;
+        
+        if response.status() == 404 {
+            return Err(anyhow::anyhow!("No releases found - you're running the latest development version"));
+        }
+        
+        if !response.status().is_success() {
+            return Err(anyhow::anyhow!("Failed to fetch latest version: HTTP {}", response.status()));
+        }
+        
+        let json: serde_json::Value = response.json().await?;
+        let tag_name = json["tag_name"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Invalid response format"))?;
+        
+        // Remove 'v' prefix if present
+        let version = tag_name.trim_start_matches('v');
+        Ok(version.to_string())
+    }
+    
+    async fn update_via_cargo(&self) -> Result<()> {
+        println!("Running: cargo install ryzan --force");
+        println!();
+        
+        let status = std::process::Command::new("cargo")
+            .args(["install", "ryzan", "--force"])
+            .status()?;
+        
+        if status.success() {
+            println!("✅ Update completed successfully!");
+            println!();
+            println!("You can now run 'ryzan --version' to verify the update.");
+        } else {
+            println!("❌ Update failed. Please try the installation script instead.");
+            println!();
+            println!("Run: curl -sSL https://raw.githubusercontent.com/simplysabir/ryzan/main/install.sh | bash");
+        }
+        
+        Ok(())
+    }
+    
+    async fn update_via_script(&self) -> Result<()> {
+        println!("Downloading and running installation script...");
+        println!();
+        
+        let status = std::process::Command::new("bash")
+            .arg("-c")
+            .arg("curl -sSL https://raw.githubusercontent.com/simplysabir/ryzan/main/install.sh | bash")
+            .status()?;
+        
+        if status.success() {
+            println!("✅ Update completed successfully!");
+            println!();
+            println!("You can now run 'ryzan --version' to verify the update.");
+        } else {
+            println!("❌ Update failed. Please try manually:");
+            println!();
+            println!("1. Visit: https://github.com/simplysabir/ryzan/releases");
+            println!("2. Download the latest version for your platform");
+            println!("3. Replace your current binary");
+        }
+        
         Ok(())
     }
 

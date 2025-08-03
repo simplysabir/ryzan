@@ -6,7 +6,7 @@ use clap::{Parser, Subcommand};
 #[command(
     about = "Enterprise-grade security with zero-trust architecture - Professional crypto management made simple"
 )]
-#[command(version = "1.0.0")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(author = "Ryzan Team")]
 pub struct Cli {
     #[command(subcommand)]
