@@ -38,13 +38,6 @@ jobs:
             artifact_name: ryzan
             asset_name: ryzan-macos-aarch64
             cross: false
-          
-          # Windows x86_64 - native build
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            artifact_name: ryzan.exe
-            asset_name: ryzan-windows-x86_64.exe
-            cross: false
 
     steps:
       - name: Checkout code

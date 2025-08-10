@@ -3,11 +3,9 @@ use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(name = "ryzan")]
-#[command(
-    about = "Enterprise-grade security with zero-trust architecture - Professional crypto management made simple"
-)]
+#[command(about = "Secure Solana wallet with 2FA protection")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
-#[command(author = "Ryzan Team")]
+#[command(author = "Sabir Khan")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
@@ -70,19 +68,11 @@ pub enum Commands {
         token: Option<String>,
     },
 
-    /// Generate a receive address
+    /// Generate a receive address and QR code
     Receive {
         /// Amount to request (optional)
         #[arg(long)]
         amount: Option<f64>,
-
-        /// Generate QR code for payment
-        #[arg(long, default_value = "false")]
-        qr: bool,
-
-        /// Use new ephemeral address
-        #[arg(long, default_value = "true")]
-        new_address: bool,
     },
 
     /// Send multiple transactions from a file

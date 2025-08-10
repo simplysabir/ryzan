@@ -43,6 +43,23 @@ pub struct UnlockedWallet {
     pub time_lock_hours: Option<u8>,
 }
 
+impl Clone for UnlockedWallet {
+    fn clone(&self) -> Self {
+        // Manual clone since Keypair doesn't implement Clone
+        let keypair_bytes = self.master_keypair.to_bytes();
+        let cloned_keypair = solana_sdk::signature::Keypair::from_bytes(&keypair_bytes).unwrap();
+
+        Self {
+            name: self.name.clone(),
+            mnemonic: self.mnemonic.clone(),
+            totp_secret: self.totp_secret.clone(),
+            master_keypair: cloned_keypair,
+            daily_limit: self.daily_limit,
+            time_lock_hours: self.time_lock_hours,
+        }
+    }
+}
+
 impl Drop for UnlockedWallet {
     fn drop(&mut self) {
         self.totp_secret.zeroize();
@@ -168,31 +185,6 @@ impl UnlockedWallet {
     pub fn get_public_key(&self) -> Pubkey {
         self.master_keypair.pubkey()
     }
-
-    pub fn derive_ephemeral_keypair(&self, index: u32) -> Result<SolanaKeypair> {
-        // Derive ephemeral keypair for transaction privacy
-        let mut derivation_seed = self.master_keypair.to_bytes().to_vec();
-        derivation_seed.extend_from_slice(&index.to_le_bytes());
-
-        // Hash the extended seed for deterministic derivation
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
-        let mut hasher = DefaultHasher::new();
-        derivation_seed.hash(&mut hasher);
-        let hash = hasher.finish();
-
-        let mut ephemeral_seed = [0u8; 32];
-        ephemeral_seed[..8].copy_from_slice(&hash.to_le_bytes());
-        ephemeral_seed[8..].copy_from_slice(&derivation_seed[..24]);
-
-        let ephemeral_keypair = derive_keypair_from_seed(&ephemeral_seed)?;
-        Ok(ephemeral_keypair)
-    }
-
-    pub fn generate_receive_address(&self, index: u32) -> Result<Pubkey> {
-        Ok(self.derive_ephemeral_keypair(index)?.pubkey())
-    }
 }
 
 #[cfg(test)]
@@ -213,25 +205,5 @@ mod tests {
         let unlocked = wallet.unlock(password).unwrap();
         assert_eq!(unlocked.name, "test_wallet");
         assert_eq!(unlocked.daily_limit, 100_000_000);
-    }
-
-    #[test]
-    fn test_ephemeral_keypair_derivation() {
-        let password = "test_password_123";
-        let (wallet, _mnemonic, _totp_secret) =
-            SecureWallet::create("test_wallet".to_string(), password, 100_000_000, None).unwrap();
-
-        let unlocked = wallet.unlock(password).unwrap();
-
-        // Generate multiple ephemeral keypairs
-        let keypair1 = unlocked.derive_ephemeral_keypair(0).unwrap();
-        let keypair2 = unlocked.derive_ephemeral_keypair(1).unwrap();
-
-        // Should be different
-        assert_ne!(keypair1.pubkey(), keypair2.pubkey());
-
-        // Should be deterministic
-        let keypair1_again = unlocked.derive_ephemeral_keypair(0).unwrap();
-        assert_eq!(keypair1.pubkey(), keypair1_again.pubkey());
     }
 }

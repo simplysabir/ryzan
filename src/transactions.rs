@@ -42,6 +42,15 @@ impl TransactionManager {
         Ok(balance)
     }
 
+    pub async fn get_address_balance(&self, address: &str) -> Result<u64> {
+        let pubkey = address.parse::<Pubkey>().context("Invalid address")?;
+        let balance = self
+            .rpc_client
+            .get_balance(&pubkey)
+            .context("Failed to fetch balance")?;
+        Ok(balance)
+    }
+
     pub async fn send_sol(
         &self,
         wallet: &UnlockedWallet,
@@ -50,14 +59,7 @@ impl TransactionManager {
         memo: Option<&str>,
         use_ephemeral: bool,
     ) -> Result<Signature> {
-        let sender_keypair = if use_ephemeral {
-            // Use ephemeral keypair for privacy
-            let index = rand::random::<u32>() % 1000;
-            wallet.derive_ephemeral_keypair(index)?
-        } else {
-            wallet.get_solana_keypair()
-        };
-
+        let sender_keypair = wallet.get_solana_keypair();
         let sender_pubkey = sender_keypair.pubkey();
 
         // Check if ephemeral account has funds
@@ -113,14 +115,7 @@ impl TransactionManager {
         memo: Option<&str>,
         use_ephemeral: bool,
     ) -> Result<Signature> {
-        let sender_keypair = if use_ephemeral {
-            // Use ephemeral keypair for privacy
-            let index = rand::random::<u32>() % 1000;
-            wallet.derive_ephemeral_keypair(index)?
-        } else {
-            wallet.get_solana_keypair()
-        };
-
+        let sender_keypair = wallet.get_solana_keypair();
         let sender_pubkey = sender_keypair.pubkey();
 
         // Get associated token accounts

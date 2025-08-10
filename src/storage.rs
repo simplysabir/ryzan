@@ -15,11 +15,13 @@ use crate::wallet::{SecureWallet, WalletConfig};
 const RYZAN_DIR: &str = "ryzan";
 const CONFIG_FILE: &str = "config.json";
 const WALLETS_DIR: &str = "vaults";
+const SESSION_FILE: &str = "session.lock";
 
 pub struct SecureStorage {
     base_path: PathBuf,
     config_path: PathBuf,
     wallets_path: PathBuf,
+    session_path: PathBuf,
 }
 
 impl SecureStorage {
@@ -29,6 +31,7 @@ impl SecureStorage {
         let base_path = config_base.join(RYZAN_DIR);
         let config_path = base_path.join(CONFIG_FILE);
         let wallets_path = base_path.join(WALLETS_DIR);
+        let session_path = base_path.join(SESSION_FILE);
 
         // Create directories if they don't exist
         fs::create_dir_all(&base_path).context("Failed to create ryzan config directory")?;
@@ -42,6 +45,7 @@ impl SecureStorage {
             base_path,
             config_path,
             wallets_path,
+            session_path,
         })
     }
 
@@ -273,6 +277,53 @@ impl SecureStorage {
         Self::set_secure_permissions(output_path)?;
         Ok(())
     }
+
+    pub fn save_session(&self, wallet_name: &str, wallet_filename: &str) -> Result<()> {
+        let session_data = SessionData {
+            wallet_name: wallet_name.to_string(),
+            wallet_filename: wallet_filename.to_string(),
+            unlock_time: chrono::Utc::now(),
+        };
+
+        let session_json =
+            serde_json::to_string(&session_data).context("Failed to serialize session data")?;
+
+        fs::write(&self.session_path, session_json).context("Failed to write session file")?;
+
+        Self::set_secure_permissions(&self.session_path)?;
+        Ok(())
+    }
+
+    pub fn load_session(&self) -> Result<Option<SessionData>> {
+        if !self.session_path.exists() {
+            return Ok(None);
+        }
+
+        let session_json =
+            fs::read_to_string(&self.session_path).context("Failed to read session file")?;
+
+        let session_data: SessionData =
+            serde_json::from_str(&session_json).context("Failed to parse session file")?;
+
+        // Check if session is still valid (15 minutes timeout)
+        let now = chrono::Utc::now();
+        let session_age = now.signed_duration_since(session_data.unlock_time);
+
+        if session_age.num_minutes() > 15 {
+            // Session expired, remove it
+            let _ = fs::remove_file(&self.session_path);
+            return Ok(None);
+        }
+
+        Ok(Some(session_data))
+    }
+
+    pub fn clear_session(&self) -> Result<()> {
+        if self.session_path.exists() {
+            fs::remove_file(&self.session_path).context("Failed to remove session file")?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -281,6 +332,13 @@ struct StorageFormat {
     storage_salt: Vec<u8>,
     nonce: [u8; 12],
     encrypted_data: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SessionData {
+    pub wallet_name: String,
+    pub wallet_filename: String,
+    pub unlock_time: chrono::DateTime<chrono::Utc>,
 }
 
 #[serde_as]
